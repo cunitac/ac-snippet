@@ -1,18 +1,38 @@
+#![allow(dead_code)]
 use cargo_snippet::snippet;
+
+#[snippet("finite")]
+trait IntoU64 {
+    fn into_u64(self) -> u64;
+}
+
+#[snippet("finite")]
+macro_rules! impl_into_u64 {
+    ($($target:ty),*) => {$(
+        impl IntoU64 for $target {
+            fn into_u64(self) -> u64 {
+                self as u64
+            }
+        }
+    )*}
+}
+
+#[snippet("finite")]
+impl_into_u64!(usize, isize, u8, u16, u32, u64, u128, i8, i16, i32, i64, i128);
+
+#[snippet("finite")]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+struct Fin(u64);
 
 #[snippet("finite")]
 const MOD: u64 = 1_000_000_007;
 
 #[snippet("finite")]
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct Finite(u64);
-
-#[snippet("finite")]
-impl Finite {
-    pub fn new(n: u64) -> Self {
-        Finite(n % MOD)
+impl Fin {
+    fn from<T: IntoU64>(n: T) -> Fin {
+        Fin(n.into_u64() % MOD)
     }
-    pub fn pow(self, mut exp: u32) -> Self {
+    fn pow(self, mut exp: u64) -> Fin {
         let mut base = self.0;
         let mut acc = 1;
         while exp > 1 {
@@ -25,128 +45,125 @@ impl Finite {
         if exp == 1 {
             acc = acc * base % MOD;
         }
-        Finite(acc)
+        Fin(acc)
+    }
+    fn recip(self) -> Fin {
+        self.pow(MOD - 2)
     }
 }
 
 #[snippet("finite")]
-impl std::fmt::Display for Finite {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+use std::fmt::{Display, Error, Formatter};
+
+#[snippet("finite")]
+impl Display for Fin {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        self.0.fmt(f)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::Add for Finite {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self {
-        Finite((self.0 + rhs.0) % MOD)
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+
+#[snippet("finite")]
+impl Neg for Fin {
+    type Output = Fin;
+    fn neg(self) -> Fin {
+        Fin::from(MOD - self.0)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::Add<u64> for Finite {
-    type Output = Self;
-    fn add(self, rhs: u64) -> Self {
-        Finite((self.0 + rhs) % MOD)
+impl Add for Fin {
+    type Output = Fin;
+    fn add(self, other: Fin) -> Fin {
+        Fin::from(self.0 + other.0)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::AddAssign for Finite {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 = (self.0 + rhs.0) % MOD;
+impl Sub for Fin {
+    type Output = Fin;
+    fn sub(self, other: Fin) -> Fin {
+        Fin::from(MOD + self.0 - other.0)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::AddAssign<u64> for Finite {
-    fn add_assign(&mut self, rhs: u64) {
-        self.0 = (self.0 + rhs) % MOD;
+impl Mul for Fin {
+    type Output = Fin;
+    fn mul(self, other: Fin) -> Fin {
+        Fin::from(self.0 * other.0)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::Sub for Finite {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self {
-        Finite((self.0 + MOD - rhs.0) % MOD)
+impl Div for Fin {
+    type Output = Fin;
+    fn div(self, other: Fin) -> Fin {
+        self * other.recip()
     }
 }
+
 #[snippet("finite")]
-impl std::ops::Sub<u64> for Finite {
-    type Output = Self;
-    fn sub(self, rhs: u64) -> Self {
-        Finite((self.0 + MOD - rhs) % MOD)
+macro_rules! impl_fin_ops {
+    ($($op:ident, $op_t:ident, $asn:ident, $asn_t:ident);*) => {$(
+        impl<T: IntoU64> $op_t<T> for Fin {
+            type Output = Fin;
+            fn $op(self, other: T) -> Fin {
+                self.$op(Fin::from(other))
+            }
+        }
+        impl $asn_t for Fin {
+            fn $asn(&mut self, rhs: Fin) {
+                *self = (*self).$op(rhs);
+            }
+        }
+        impl<T: IntoU64> $asn_t<T> for Fin {
+            fn $asn(&mut self, rhs: T) {
+                *self = (*self).$op(rhs);
+            }
+        }
+    )*};
+}
+
+#[snippet("finite")]
+impl_fin_ops!(add, Add, add_assign, AddAssign; sub, Sub, sub_assign, SubAssign; mul, Mul, mul_assign, MulAssign; div, Div, div_assign, DivAssign);
+
+#[snippet("finite")]
+use std::iter::{Product, Sum};
+
+#[snippet("finite")]
+impl Sum for Fin {
+    fn sum<I: Iterator<Item = Fin>>(iter: I) -> Fin {
+        iter.fold(Fin(0), Add::add)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::SubAssign for Finite {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.0 = (self.0 + MOD - rhs.0) % MOD;
+impl<'a> Sum<&'a Fin> for Fin {
+    fn sum<I: Iterator<Item = &'a Fin>>(iter: I) -> Fin {
+        iter.fold(Fin(0), |a, &b| a.add(b))
     }
 }
+
 #[snippet("finite")]
-impl std::ops::SubAssign<u64> for Finite {
-    fn sub_assign(&mut self, rhs: u64) {
-        self.0 = (self.0 + MOD - rhs) % MOD;
+impl Product for Fin {
+    fn product<I: Iterator<Item = Fin>>(iter: I) -> Fin {
+        iter.fold(Fin(0), Mul::mul)
     }
 }
+
 #[snippet("finite")]
-impl std::ops::Mul for Finite {
-    type Output = Self;
-    fn mul(self, rhs: Self) -> Self {
-        Finite(self.0 * rhs.0 % MOD)
-    }
-}
-#[snippet("finite")]
-impl std::ops::Mul<u64> for Finite {
-    type Output = Self;
-    fn mul(self, rhs: u64) -> Self {
-        Finite(self.0 * rhs % MOD)
-    }
-}
-#[snippet("finite")]
-impl std::ops::MulAssign for Finite {
-    fn mul_assign(&mut self, rhs: Self) {
-        self.0 = self.0 * rhs.0 % MOD;
-    }
-}
-#[snippet("finite")]
-impl std::ops::MulAssign<u64> for Finite {
-    fn mul_assign(&mut self, rhs: u64) {
-        self.0 = self.0 * rhs % MOD;
-    }
-}
-#[snippet("finite")]
-impl std::ops::Div for Finite {
-    type Output = Self;
-    fn div(self, rhs: Self) -> Self {
-        self * rhs.pow((MOD - 2) as u32)
-    }
-}
-#[snippet("finite")]
-impl std::ops::Div<u64> for Finite {
-    type Output = Self;
-    fn div(self, rhs: u64) -> Self {
-        self * Finite(rhs).pow((MOD - 2) as u32)
-    }
-}
-#[snippet("finite")]
-impl std::ops::DivAssign for Finite {
-    fn div_assign(&mut self, rhs: Self) {
-        *self = *self * rhs.pow((MOD - 2) as u32);
-    }
-}
-#[snippet("finite")]
-impl std::ops::DivAssign<u64> for Finite {
-    fn div_assign(&mut self, rhs: u64) {
-        *self = *self * Finite(rhs).pow((MOD - 2) as u32);
+impl<'a> Product<&'a Fin> for Fin {
+    fn product<I: Iterator<Item = &'a Fin>>(iter: I) -> Fin {
+        iter.fold(Fin(0), |a, &b| a.mul(b))
     }
 }
 
 #[test]
-fn test_finite() {
-    let one = Finite(1);
-    let mil = Finite(1_000_000);
-    let max = Finite(MOD - 1);
-    assert_eq!(one / mil * mil, one);
-    assert_eq!(one / max * max, one);
-    assert_eq!(mil * max / max, mil);
-    assert_eq!(max * max, one)
+fn finite_test() {
+    assert_eq!(Fin::from(MOD), Fin(0));
+    assert_eq!(Fin::from(MOD as usize), Fin(0));
+    assert_eq!(Fin(1000000).recip() * Fin(1000000), Fin(1));
 }
