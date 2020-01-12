@@ -1,0 +1,8 @@
+[package]
+name = "ac-snippet"
+version = "0.1.0"
+authors = ["yumat"]
+edition = "2018"
+
+[dependencies]
+cargo-snippet = "0.4"
